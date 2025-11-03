@@ -8,7 +8,7 @@
 #include <vector>
 #include <string>   // Para leer la entrada de forma segura
 #include <sstream>  // Para validar la entrada numérica
-#include <cctype>   // Para tolower() (lo usaremos en el commit 3)
+#include <cctype>   // Para tolower()
 
  // --- Constantes Globales del Tablero ---
 const int FILAS = 6;
@@ -23,15 +23,33 @@ void mostrarTablero(const std::vector<std::vector<char>>& tablero);
 int obtenerJugada(const std::vector<std::vector<char>>& tablero, char jugador);
 bool esColumnaValida(const std::vector<std::vector<char>>& tablero, int col);
 int colocarFicha(std::vector<std::vector<char>>& tablero, int col, char ficha);
-// bool verificarGanador(...); // Lo añadiremos en el próximo commit
+bool verificarGanador(const std::vector<std::vector<char>>& tablero, int r, int c, char ficha);
 void jugarPartida();
 
 /**
- * @brief Función principal.
+ * @brief Función principal que maneja el bucle de "jugar de nuevo".
  */
 int main() {
-    jugarPartida();
-    // La lógica de "jugar de nuevo" irá en el próximo commit
+    char jugarDeNuevo = 's';
+    do {
+        jugarPartida();
+
+        std::string input;
+        while (true) {
+            std::cout << "\n¿Quieren jugar otra partida? (s/n): ";
+            std::getline(std::cin, input); // Leer la línea completa
+
+            if (!input.empty()) {
+                jugarDeNuevo = std::tolower(input[0]);
+                if (jugarDeNuevo == 's' || jugarDeNuevo == 'n') {
+                    break;
+                }
+            }
+            std::cout << "Entrada invalida. Por favor, ingresa 's' o 'n'." << std::endl;
+        }
+
+    } while (jugarDeNuevo == 's');
+
     std::cout << "\n¡Gracias por jugar a Conecta 4! Adios." << std::endl;
     return 0;
 }
@@ -44,32 +62,42 @@ void jugarPartida() {
     inicializarTablero(tablero);
 
     char jugadorActual = JUGADOR_1;
-    // bool juegoTerminado = false; // Se usará en el commit 3
+    bool juegoTerminado = false; // Ahora sí lo usamos
     int turnosJugados = 0;
 
     mostrarTablero(tablero);
 
-    // Bucle de juego principal
-    // Por ahora, termina solo cuando el tablero está lleno
-    while (turnosJugados < FILAS * COLUMNAS) {
+    while (!juegoTerminado) {
         // 1. Obtener jugada
         int col = obtenerJugada(tablero, jugadorActual);
 
-        // 2. Colocar la ficha
-        colocarFicha(tablero, col, jugadorActual);
+        // 2. Colocar la ficha y obtener la fila donde cayó
+        int fila = colocarFicha(tablero, col, jugadorActual);
 
         turnosJugados++;
         mostrarTablero(tablero);
 
-        // 3. Verificar si hay ganador (PENDIENTE)
-
-        // 4. Verificar si hay empate (PENDIENTE)
-
+        // 3. Verificar si hay ganador
+        if (verificarGanador(tablero, fila, col, jugadorActual)) {
+            std::cout << "\n****************************************\n";
+            std::cout << "   ¡El Jugador " << (jugadorActual == JUGADOR_1 ? '1' : '2')
+                << " (" << jugadorActual << ") HA GANADO!\n";
+            std::cout << "****************************************\n";
+            juegoTerminado = true;
+        }
+        // 4. Verificar si hay empate
+        else if (turnosJugados == FILAS * COLUMNAS) {
+            std::cout << "\n****************************************\n";
+            std::cout << "             ¡EMPATE!\n";
+            std::cout << "     El tablero esta lleno.\n";
+            std::cout << "****************************************\n";
+            juegoTerminado = true;
+        }
         // 5. Cambiar de turno
-        jugadorActual = (jugadorActual == JUGADOR_1) ? JUGADOR_2 : JUGADOR_1;
+        else {
+            jugadorActual = (jugadorActual == JUGADOR_1) ? JUGADOR_2 : JUGADOR_1;
+        }
     }
-
-    std::cout << "\nJuego terminado (lógica de ganador pendiente).\n";
 }
 
 /**
@@ -135,7 +163,7 @@ int obtenerJugada(const std::vector<std::vector<char>>& tablero, char jugador) {
  * @brief Verifica si una ficha puede ser colocada en una columna (si no está llena).
  */
 bool esColumnaValida(const std::vector<std::vector<char>>& tablero, int col) {
-    return tablero[0][col] == VACIO; // Solo chequear la celda superior
+    return tablero[0][col] == VACIO;
 }
 
 /**
@@ -149,5 +177,75 @@ int colocarFicha(std::vector<std::vector<char>>& tablero, int col, char ficha) {
             return r; // Devuelve la fila donde se colocó
         }
     }
-    return -1; // No debería pasar si esColumnaValida se usó
+    return -1; // No debería pasar
+}
+
+/**
+ * @brief Verifica las 4 direcciones (H, V, D1, D2) desde la última jugada.
+ */
+bool verificarGanador(const std::vector<std::vector<char>>& tablero, int r, int c, char ficha) {
+
+    // --- 1. Verificación Horizontal (← →) ---
+    int contador = 0;
+    for (int j = 0; j < COLUMNAS; ++j) {
+        if (tablero[r][j] == ficha) {
+            contador++;
+            if (contador >= 4) return true;
+        }
+        else {
+            contador = 0; // Rompe la racha
+        }
+    }
+
+    // --- 2. Verificación Vertical (↑ ↓) ---
+    contador = 0;
+    for (int i = 0; i < FILAS; ++i) {
+        if (tablero[i][c] == ficha) {
+            contador++;
+            if (contador >= 4) return true;
+        }
+        else {
+            contador = 0;
+        }
+    }
+
+    // --- 3. Verificación Diagonal Descendente (↘) ---
+    contador = 0;
+    int diag_r = r, diag_c = c;
+    while (diag_r > 0 && diag_c > 0) { // Ir al inicio de la diagonal (arriba-izq)
+        diag_r--;
+        diag_c--;
+    }
+    while (diag_r < FILAS && diag_c < COLUMNAS) { // Recorrerla
+        if (tablero[diag_r][diag_c] == ficha) {
+            contador++;
+            if (contador >= 4) return true;
+        }
+        else {
+            contador = 0;
+        }
+        diag_r++;
+        diag_c++;
+    }
+
+    // --- 4. Verificación Diagonal Ascendente (↗) ---
+    contador = 0;
+    diag_r = r; diag_c = c;
+    while (diag_r < FILAS - 1 && diag_c > 0) { // Ir al inicio de la diagonal (abajo-izq)
+        diag_r++;
+        diag_c--;
+    }
+    while (diag_r >= 0 && diag_c < COLUMNAS) { // Recorrerla
+        if (tablero[diag_r][diag_c] == ficha) {
+            contador++;
+            if (contador >= 4) return true;
+        }
+        else {
+            contador = 0;
+        }
+        diag_r--;
+        diag_c++;
+    }
+
+    return false; // No se encontró ganador
 }
